@@ -43,13 +43,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ADK runner & Vertex AI Memory Bank setup
+# ADK runner & Memory Service setup
 session_service = InMemorySessionService()
-memory_service = VertexAiMemoryBankService(
-    project="qwiklabs-gcp-03-1811e09e9290",
-    location="us-central1",
-    agent_engine_id="709644046020116480",
-)
+try:
+    memory_service = VertexAiMemoryBankService(
+        project="qwiklabs-gcp-03-1811e09e9290",
+        location="us-central1",
+        agent_engine_id="709644046020116480",
+    )
+except Exception as e:
+    from google.adk.memory import InMemoryMemoryService
+    memory_service = InMemoryMemoryService()
 
 runner = Runner(
     app=adk_app,

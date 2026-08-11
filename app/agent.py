@@ -31,7 +31,7 @@ async def generate_memories_callback(callback_context: CallbackContext):
     return None
 
 
-MODEL = "gemini-3.6-flash"
+MODEL = "gemini-2.5-flash"
 
 
 import requests
