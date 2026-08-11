@@ -127,124 +127,145 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     }
 
-    function switchTab(mode) {
-      tabEdit.classList.toggle('active', mode === 'edit');
-      tabView.classList.toggle('active', mode === 'view');
-      if (tabMap) tabMap.classList.toggle('active', mode === 'map');
-      if (tabDiff) tabDiff.classList.toggle('active', mode === 'diff');
+    // Manual Edit in Itinerary Editor
+    itineraryEditor.addEventListener('input', () => {
+      isItineraryModified = true;
+      saveIndicator.className = 'status-unsaved';
+      saveIndicator.innerHTML = '<i class="fa-solid fa-pen"></i> Unsaved changes...';
+      updateCharCount();
+    });
 
-      editorContainer.classList.toggle('hidden', mode !== 'edit');
-      previewContainer.classList.toggle('hidden', mode !== 'view');
-      if (mapContainer) mapContainer.classList.toggle('hidden', mode !== 'map');
-      if (diffContainer) diffContainer.classList.toggle('hidden', mode !== 'diff');
+    // Save Itinerary Button
+    btnSaveItinerary.addEventListener('click', () => {
+      saveItinerary();
+    });
 
-      if (mode === 'view') {
-        renderMarkdownPreview();
-      } else if (mode === 'map') {
-        renderMapView();
+    // Sync Agent Button
+    btnSyncAgent.addEventListener('click', async () => {
+      await saveItinerary();
+      addSystemNotification('Itinerary synced with agent memory!');
+    });
+  }
+
+  // --- TAB & DIFF MANAGEMENT (Top-Level Scope) ---
+  function switchTab(mode) {
+    if (tabEdit) tabEdit.classList.toggle('active', mode === 'edit');
+    if (tabView) tabView.classList.toggle('active', mode === 'view');
+    if (tabMap) tabMap.classList.toggle('active', mode === 'map');
+    if (tabDiff) tabDiff.classList.toggle('active', mode === 'diff');
+
+    if (editorContainer) editorContainer.classList.toggle('hidden', mode !== 'edit');
+    if (previewContainer) previewContainer.classList.toggle('hidden', mode !== 'view');
+    if (mapContainer) mapContainer.classList.toggle('hidden', mode !== 'map');
+    if (diffContainer) diffContainer.classList.toggle('hidden', mode !== 'diff');
+
+    if (mode === 'view') {
+      renderMarkdownPreview();
+    } else if (mode === 'map') {
+      renderMapView();
+    }
+  }
+
+  function computeLineDiff(oldText, newText) {
+    const oldLines = oldText ? oldText.split('\n') : [];
+    const newLines = newText ? newText.split('\n') : [];
+    
+    const matrix = Array(oldLines.length + 1).fill(null).map(() => Array(newLines.length + 1).fill(0));
+    for (let x = 1; x <= oldLines.length; x++) {
+      for (let y = 1; y <= newLines.length; y++) {
+        if (oldLines[x - 1] === newLines[y - 1]) {
+          matrix[x][y] = matrix[x - 1][y - 1] + 1;
+        } else {
+          matrix[x][y] = Math.max(matrix[x - 1][y], matrix[x][y - 1]);
+        }
       }
     }
-
-    function computeLineDiff(oldText, newText) {
-      const oldLines = oldText ? oldText.split('\n') : [];
-      const newLines = newText ? newText.split('\n') : [];
-      
-      const matrix = Array(oldLines.length + 1).fill(null).map(() => Array(newLines.length + 1).fill(0));
-      for (let x = 1; x <= oldLines.length; x++) {
-        for (let y = 1; y <= newLines.length; y++) {
-          if (oldLines[x - 1] === newLines[y - 1]) {
-            matrix[x][y] = matrix[x - 1][y - 1] + 1;
-          } else {
-            matrix[x][y] = Math.max(matrix[x - 1][y], matrix[x][y - 1]);
-          }
-        }
+    
+    let x = oldLines.length, y = newLines.length;
+    const lcs = [];
+    while (x > 0 && y > 0) {
+      if (oldLines[x - 1] === newLines[y - 1]) {
+        lcs.unshift({ type: 'unchanged', line: oldLines[x - 1], oldIdx: x - 1, newIdx: y - 1 });
+        x--; y--;
+      } else if (matrix[x - 1][y] >= matrix[x][y - 1]) {
+        x--;
+      } else {
+        y--;
       }
-      
-      let x = oldLines.length, y = newLines.length;
-      const lcs = [];
-      while (x > 0 && y > 0) {
-        if (oldLines[x - 1] === newLines[y - 1]) {
-          lcs.unshift({ type: 'unchanged', line: oldLines[x - 1], oldIdx: x - 1, newIdx: y - 1 });
-          x--; y--;
-        } else if (matrix[x - 1][y] >= matrix[x][y - 1]) {
-          x--;
-        } else {
-          y--;
-        }
-      }
-      
-      const diffLines = [];
-      let oldPos = 0, newPos = 0;
-      for (const item of lcs) {
-        while (oldPos < item.oldIdx) {
-          diffLines.push({ type: 'removed', content: oldLines[oldPos] });
-          oldPos++;
-        }
-        while (newPos < item.newIdx) {
-          diffLines.push({ type: 'added', content: newLines[newPos] });
-          newPos++;
-        }
-        diffLines.push({ type: 'unchanged', content: item.line });
-        oldPos++;
-        newPos++;
-      }
-      while (oldPos < oldLines.length) {
+    }
+    
+    const diffLines = [];
+    let oldPos = 0, newPos = 0;
+    for (const item of lcs) {
+      while (oldPos < item.oldIdx) {
         diffLines.push({ type: 'removed', content: oldLines[oldPos] });
         oldPos++;
       }
-      while (newPos < newLines.length) {
+      while (newPos < item.newIdx) {
         diffLines.push({ type: 'added', content: newLines[newPos] });
         newPos++;
       }
-      
-      return diffLines;
+      diffLines.push({ type: 'unchanged', content: item.line });
+      oldPos++;
+      newPos++;
     }
+    while (oldPos < oldLines.length) {
+      diffLines.push({ type: 'removed', content: oldLines[oldPos] });
+      oldPos++;
+    }
+    while (newPos < newLines.length) {
+      diffLines.push({ type: 'added', content: newLines[newPos] });
+      newPos++;
+    }
+    
+    return diffLines;
+  }
 
-    function renderDiffView(oldText, newText) {
-      if (!diffView) return;
-      const diffLines = computeLineDiff(oldText, newText);
-      diffView.innerHTML = '';
-      
-      let addedCount = 0;
-      let removedCount = 0;
+  function renderDiffView(oldText, newText) {
+    if (!diffView) return;
+    const diffLines = computeLineDiff(oldText, newText);
+    diffView.innerHTML = '';
+    
+    let addedCount = 0;
+    let removedCount = 0;
 
-      diffLines.forEach(line => {
-        const lineEl = document.createElement('div');
-        lineEl.className = `diff-line ${line.type}`;
-        let prefix = '  ';
-        if (line.type === 'added') {
-          prefix = '+ ';
-          addedCount++;
-        } else if (line.type === 'removed') {
-          prefix = '- ';
-          removedCount++;
-        }
-        lineEl.textContent = prefix + line.content;
-        diffView.appendChild(lineEl);
-      });
-
-      const diffInfo = document.querySelector('.diff-toolbar-info span');
-      if (diffInfo) {
-        diffInfo.innerHTML = `Agent Proposed Itinerary Changes <span style="color:#7ee787; font-size:0.85rem; margin-left:8px;">+${addedCount} lines</span> <span style="color:#ff7b72; font-size:0.85rem; margin-left:4px;">-${removedCount} lines</span>`;
+    diffLines.forEach(line => {
+      const lineEl = document.createElement('div');
+      lineEl.className = `diff-line ${line.type}`;
+      let prefix = '  ';
+      if (line.type === 'added') {
+        prefix = '+ ';
+        addedCount++;
+      } else if (line.type === 'removed') {
+        prefix = '- ';
+        removedCount++;
       }
-    }
+      lineEl.textContent = prefix + line.content;
+      diffView.appendChild(lineEl);
+    });
 
-    function showDiffTab(proposedContent) {
-      currentProposedContent = proposedContent;
-      if (tabDiff) {
-        tabDiff.classList.remove('hidden');
-      }
-      renderDiffView(itineraryEditor.value, proposedContent);
-      switchTab('diff');
+    const diffInfo = document.querySelector('.diff-toolbar-info span');
+    if (diffInfo) {
+      diffInfo.innerHTML = `Agent Proposed Itinerary Changes <span style="color:#7ee787; font-size:0.85rem; margin-left:8px;">+${addedCount} lines</span> <span style="color:#ff7b72; font-size:0.85rem; margin-left:4px;">-${removedCount} lines</span>`;
     }
+  }
 
-    function hideDiffTab() {
-      currentProposedContent = null;
-      if (tabDiff) {
-        tabDiff.classList.add('hidden');
-      }
-      switchTab('view');
+  function showDiffTab(proposedContent) {
+    currentProposedContent = proposedContent;
+    if (tabDiff) {
+      tabDiff.classList.remove('hidden');
     }
+    renderDiffView(itineraryEditor.value, proposedContent);
+    switchTab('diff');
+  }
+
+  function hideDiffTab() {
+    currentProposedContent = null;
+    if (tabDiff) {
+      tabDiff.classList.add('hidden');
+    }
+    switchTab('view');
+  }
 
     // Manual Edit in Itinerary Editor
     itineraryEditor.addEventListener('input', () => {
