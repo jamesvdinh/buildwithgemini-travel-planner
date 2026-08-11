@@ -34,6 +34,14 @@ document.addEventListener('DOMContentLoaded', () => {
   const mapLocationsList = document.getElementById('map-locations-list');
   const mapLocationCount = document.getElementById('map-location-count');
 
+  const tabDiff = document.getElementById('tab-diff');
+  const diffContainer = document.getElementById('diff-container');
+  const btnApproveDiff = document.getElementById('btn-approve-diff');
+  const btnRejectDiff = document.getElementById('btn-reject-diff');
+  const diffView = document.getElementById('diff-view');
+
+  let currentProposedContent = null;
+
   const btnSaveItinerary = document.getElementById('btn-save-itinerary');
   const btnSyncAgent = document.getElementById('btn-sync-agent');
   const saveIndicator = document.getElementById('save-indicator');
@@ -79,6 +87,39 @@ document.addEventListener('DOMContentLoaded', () => {
     tabEdit.addEventListener('click', () => switchTab('edit'));
     tabView.addEventListener('click', () => switchTab('view'));
     if (tabMap) tabMap.addEventListener('click', () => switchTab('map'));
+    if (tabDiff) tabDiff.addEventListener('click', () => switchTab('diff'));
+
+    if (btnApproveDiff) {
+      btnApproveDiff.addEventListener('click', async () => {
+        if (!currentProposedContent) return;
+        btnApproveDiff.disabled = true;
+        btnApproveDiff.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Applying...';
+        try {
+          const res = await fetch(`${API_BASE_URL}/api/itinerary/approve`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ content: currentProposedContent })
+          });
+          if (res.ok) {
+            await loadItinerary();
+            hideDiffTab();
+          } else {
+            alert('Failed to approve itinerary edit.');
+          }
+        } catch (err) {
+          alert('Error approving itinerary edit: ' + err.message);
+        } finally {
+          btnApproveDiff.disabled = false;
+          btnApproveDiff.innerHTML = '<i class="fa-solid fa-check"></i> Approve & Apply';
+        }
+      });
+    }
+
+    if (btnRejectDiff) {
+      btnRejectDiff.addEventListener('click', () => {
+        hideDiffTab();
+      });
+    }
 
     if (selMapLocation) {
       selMapLocation.addEventListener('change', (e) => {
@@ -90,16 +131,119 @@ document.addEventListener('DOMContentLoaded', () => {
       tabEdit.classList.toggle('active', mode === 'edit');
       tabView.classList.toggle('active', mode === 'view');
       if (tabMap) tabMap.classList.toggle('active', mode === 'map');
+      if (tabDiff) tabDiff.classList.toggle('active', mode === 'diff');
 
       editorContainer.classList.toggle('hidden', mode !== 'edit');
       previewContainer.classList.toggle('hidden', mode !== 'view');
       if (mapContainer) mapContainer.classList.toggle('hidden', mode !== 'map');
+      if (diffContainer) diffContainer.classList.toggle('hidden', mode !== 'diff');
 
       if (mode === 'view') {
         renderMarkdownPreview();
       } else if (mode === 'map') {
         renderMapView();
       }
+    }
+
+    function computeLineDiff(oldText, newText) {
+      const oldLines = oldText ? oldText.split('\n') : [];
+      const newLines = newText ? newText.split('\n') : [];
+      
+      const matrix = Array(oldLines.length + 1).fill(null).map(() => Array(newLines.length + 1).fill(0));
+      for (let x = 1; x <= oldLines.length; x++) {
+        for (let y = 1; y <= newLines.length; y++) {
+          if (oldLines[x - 1] === newLines[y - 1]) {
+            matrix[x][y] = matrix[x - 1][y - 1] + 1;
+          } else {
+            matrix[x][y] = Math.max(matrix[x - 1][y], matrix[x][y - 1]);
+          }
+        }
+      }
+      
+      let x = oldLines.length, y = newLines.length;
+      const lcs = [];
+      while (x > 0 && y > 0) {
+        if (oldLines[x - 1] === newLines[y - 1]) {
+          lcs.unshift({ type: 'unchanged', line: oldLines[x - 1], oldIdx: x - 1, newIdx: y - 1 });
+          x--; y--;
+        } else if (matrix[x - 1][y] >= matrix[x][y - 1]) {
+          x--;
+        } else {
+          y--;
+        }
+      }
+      
+      const diffLines = [];
+      let oldPos = 0, newPos = 0;
+      for (const item of lcs) {
+        while (oldPos < item.oldIdx) {
+          diffLines.push({ type: 'removed', content: oldLines[oldPos] });
+          oldPos++;
+        }
+        while (newPos < item.newIdx) {
+          diffLines.push({ type: 'added', content: newLines[newPos] });
+          newPos++;
+        }
+        diffLines.push({ type: 'unchanged', content: item.line });
+        oldPos++;
+        newPos++;
+      }
+      while (oldPos < oldLines.length) {
+        diffLines.push({ type: 'removed', content: oldLines[oldPos] });
+        oldPos++;
+      }
+      while (newPos < newLines.length) {
+        diffLines.push({ type: 'added', content: newLines[newPos] });
+        newPos++;
+      }
+      
+      return diffLines;
+    }
+
+    function renderDiffView(oldText, newText) {
+      if (!diffView) return;
+      const diffLines = computeLineDiff(oldText, newText);
+      diffView.innerHTML = '';
+      
+      let addedCount = 0;
+      let removedCount = 0;
+
+      diffLines.forEach(line => {
+        const lineEl = document.createElement('div');
+        lineEl.className = `diff-line ${line.type}`;
+        let prefix = '  ';
+        if (line.type === 'added') {
+          prefix = '+ ';
+          addedCount++;
+        } else if (line.type === 'removed') {
+          prefix = '- ';
+          removedCount++;
+        }
+        lineEl.textContent = prefix + line.content;
+        diffView.appendChild(lineEl);
+      });
+
+      const diffInfo = document.querySelector('.diff-toolbar-info span');
+      if (diffInfo) {
+        diffInfo.innerHTML = `Agent Proposed Itinerary Changes <span style="color:#7ee787; font-size:0.85rem; margin-left:8px;">+${addedCount} lines</span> <span style="color:#ff7b72; font-size:0.85rem; margin-left:4px;">-${removedCount} lines</span>`;
+      }
+    }
+
+    function showDiffTab(proposedContent) {
+      currentProposedContent = proposedContent;
+      if (tabDiff) {
+        tabDiff.classList.remove('hidden');
+      }
+      renderDiffView(itineraryEditor.value, proposedContent);
+      switchTab('diff');
+    }
+
+    function hideDiffTab() {
+      currentProposedContent = null;
+      if (tabDiff) {
+        tabDiff.classList.add('hidden');
+      }
+      switchTab('view');
     }
 
     // Manual Edit in Itinerary Editor
@@ -679,6 +823,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (role === 'assistant' && proposedItinerary && !autoApplied) {
       const card = createPermissionApprovalCard(proposedItinerary);
       row.appendChild(card);
+      showDiffTab(proposedItinerary);
     }
 
     chatMessages.appendChild(row);
@@ -693,17 +838,25 @@ document.addEventListener('DOMContentLoaded', () => {
       <div class="permission-title">
         <i class="fa-solid fa-shield-halved"></i> Permission Requested: Update <code>itinerary.md</code>
       </div>
-      <div style="font-size:0.8rem; color:var(--text-muted); line-height:1.4;">
-        The agent requested permission to rewrite your master <code>itinerary.md</code> file with the new recommendations.
+      <div style="font-size:0.8rem; color:var(--text-muted); line-height:1.4; margin-bottom:8px;">
+        The agent proposed changes to your master itinerary. View the visual diff in the Proposed Diff tab above or decide below.
       </div>
-      <div class="permission-actions">
-        <button class="btn-approve"><i class="fa-solid fa-check"></i> Approve & Save to Itinerary</button>
+      <div class="permission-actions" style="display:flex; gap:8px; flex-wrap:wrap;">
+        <button class="btn-view-diff" style="background:#334155; color:#fff; border:1px solid #475569; border-radius:6px; padding:6px 12px; font-size:0.8rem; cursor:pointer;"><i class="fa-solid fa-code-compare"></i> View Proposed Diff</button>
+        <button class="btn-approve"><i class="fa-solid fa-check"></i> Approve & Save</button>
         <button class="btn-reject"><i class="fa-solid fa-xmark"></i> Reject Edit</button>
       </div>
     `;
 
+    const btnViewDiffCard = card.querySelector('.btn-view-diff');
     const btnApprove = card.querySelector('.btn-approve');
     const btnReject = card.querySelector('.btn-reject');
+
+    if (btnViewDiffCard) {
+      btnViewDiffCard.addEventListener('click', () => {
+        showDiffTab(proposedContent);
+      });
+    }
 
     btnApprove.addEventListener('click', async () => {
       btnApprove.disabled = true;
@@ -721,6 +874,7 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
           `;
           await loadItinerary();
+          hideDiffTab();
         } else {
           alert('Failed to approve itinerary edit.');
         }
@@ -735,6 +889,7 @@ document.addEventListener('DOMContentLoaded', () => {
           ❌ Proposed itinerary edit rejected by user.
         </div>
       `;
+      hideDiffTab();
     });
 
     return card;

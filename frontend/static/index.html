@@ -145,6 +145,7 @@
           <button id="tab-edit" class="tab-btn active"><i class="fa-solid fa-code"></i> Edit (.md)</button>
           <button id="tab-view" class="tab-btn"><i class="fa-solid fa-eye"></i> Formatted View</button>
           <button id="tab-map" class="tab-btn"><i class="fa-solid fa-map-location-dot"></i> Map View</button>
+          <button id="tab-diff" class="tab-btn hidden"><i class="fa-solid fa-code-compare text-warning"></i> Proposed Diff ⚡</button>
         </div>
       </div>
 
@@ -184,6 +185,21 @@
           <div id="interactive-leaflet-map" style="width:100%; height:100%; z-index:1;"></div>
           <iframe id="google-map-iframe" class="hidden" width="100%" height="100%" frameborder="0" style="border:0;" allowfullscreen="" loading="lazy" referrerpolicy="no-referrer-when-downgrade" src="https://maps.google.com/maps?q=Tokyo,Japan&t=&z=12&ie=UTF8&iwloc=&output=embed"></iframe>
         </div>
+      </div>
+
+      <!-- Mode 4: Proposed Diff View -->
+      <div id="diff-container" class="diff-container hidden">
+        <div class="diff-toolbar">
+          <div class="diff-toolbar-info">
+            <i class="fa-solid fa-wand-magic-sparkles text-warning"></i>
+            <span>Agent Proposed Itinerary Changes</span>
+          </div>
+          <div class="diff-toolbar-actions" style="display:flex; gap:8px;">
+            <button id="btn-approve-diff" class="btn btn-sm btn-success"><i class="fa-solid fa-check"></i> Approve & Apply</button>
+            <button id="btn-reject-diff" class="btn btn-sm btn-outline"><i class="fa-solid fa-xmark"></i> Reject</button>
+          </div>
+        </div>
+        <div id="diff-view" class="diff-view-content"></div>
       </div>
     </section>
 
