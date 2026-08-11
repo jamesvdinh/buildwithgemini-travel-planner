@@ -145,6 +145,15 @@ document.addEventListener('DOMContentLoaded', () => {
       await saveItinerary();
       addSystemNotification('Itinerary synced with agent memory!');
     });
+
+    // Quick Prompts
+    document.querySelectorAll('.prompt-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        const promptText = chip.getAttribute('data-prompt');
+        chatInput.value = promptText;
+        chatInput.focus();
+      });
+    });
   }
 
   // --- TAB & DIFF MANAGEMENT (Top-Level Scope) ---
@@ -265,35 +274,6 @@ document.addEventListener('DOMContentLoaded', () => {
       tabDiff.classList.add('hidden');
     }
     switchTab('view');
-  }
-
-    // Manual Edit in Itinerary Editor
-    itineraryEditor.addEventListener('input', () => {
-      isItineraryModified = true;
-      saveIndicator.className = 'status-unsaved';
-      saveIndicator.innerHTML = '<i class="fa-solid fa-pen"></i> Unsaved changes...';
-      updateCharCount();
-    });
-
-    // Save Itinerary Button
-    btnSaveItinerary.addEventListener('click', () => {
-      saveItinerary();
-    });
-
-    // Sync Agent Button
-    btnSyncAgent.addEventListener('click', async () => {
-      await saveItinerary();
-      addSystemNotification('Itinerary synced with AI Agent context!');
-    });
-
-    // Quick Prompts
-    document.querySelectorAll('.prompt-chip').forEach(chip => {
-      chip.addEventListener('click', () => {
-        const promptText = chip.getAttribute('data-prompt');
-        chatInput.value = promptText;
-        chatInput.focus();
-      });
-    });
   }
 
   // --- ITINERARY SOURCE OF TRUTH (MD) FUNCTIONS ---
