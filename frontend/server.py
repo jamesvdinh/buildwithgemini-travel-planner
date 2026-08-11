@@ -30,7 +30,18 @@ from app.agent import app as adk_app
 ITINERARY_FILE = BASE_DIR / "itinerary.md"
 CHATS_FILE = BASE_DIR / "frontend" / "chats_store.json"
 
+from fastapi.middleware.cors import CORSMiddleware
+
 app = FastAPI(title="Travel Planner AI Web App")
+
+# Enable CORS for GitHub Pages & web clients
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # ADK runner & Vertex AI Memory Bank setup
 session_service = InMemorySessionService()
