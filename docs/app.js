@@ -1,4 +1,10 @@
 document.addEventListener('DOMContentLoaded', () => {
+  // API Endpoint configuration for GitHub Pages & Cross-Origin requests
+  const CLOUD_RUN_API_URL = 'https://travel-planner-api-659310514131.us-central1.run.app';
+  const API_BASE_URL = (window.location.hostname.includes('github.io') || window.location.protocol === 'file:')
+    ? CLOUD_RUN_API_URL
+    : '';
+
   // Global State
   let currentSessionId = null;
   let isItineraryModified = false;
@@ -128,7 +134,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // --- ITINERARY SOURCE OF TRUTH (MD) FUNCTIONS ---
   async function loadItinerary() {
     try {
-      const res = await fetch('/api/itinerary');
+      const res = await fetch(`${API_BASE_URL}/api/itinerary`);
       const data = await res.json();
       itineraryEditor.value = data.content || '';
       updateCharCount();
@@ -146,7 +152,7 @@ document.addEventListener('DOMContentLoaded', () => {
       btnSaveItinerary.disabled = true;
       btnSaveItinerary.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
 
-      const res = await fetch('/api/itinerary', {
+      const res = await fetch(`${API_BASE_URL}/api/itinerary`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: itineraryEditor.value })
@@ -470,7 +476,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // --- PAST CHATS / SESSIONS FUNCTIONS ---
   async function loadChatsList() {
     try {
-      const res = await fetch('/api/chats');
+      const res = await fetch(`${API_BASE_URL}/api/chats`);
       const data = await res.json();
       renderChatsList(data.sessions || []);
     } catch (err) {
@@ -515,7 +521,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function startNewChat() {
     try {
-      const res = await fetch('/api/chats/new', { method: 'POST' });
+      const res = await fetch(`${API_BASE_URL}/api/chats/new`, { method: 'POST' });
       const data = await res.json();
       currentSessionId = data.session_id;
       currentChatTitle.textContent = data.title;
@@ -603,7 +609,7 @@ document.addEventListener('DOMContentLoaded', () => {
     btnSend.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Thinking...';
 
     try {
-      const res = await fetch('/api/chat', {
+      const res = await fetch(`${API_BASE_URL}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -703,7 +709,7 @@ document.addEventListener('DOMContentLoaded', () => {
       btnApprove.disabled = true;
       btnApprove.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
       try {
-        const res = await fetch('/api/itinerary/approve', {
+        const res = await fetch(`${API_BASE_URL}/api/itinerary/approve`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ content: proposedContent })
