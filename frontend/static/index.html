@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>✈️ Travel Planner AI - Live Itinerary & Observability Studio</title>
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+  
+  <!-- Icons & Markdown Renderer & Leaflet Interactive Map -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="dark-theme">
+
+  <!-- Top App Navigation Bar -->
+  <header class="app-header">
+    <div class="brand">
+      <span class="brand-icon">✈️</span>
+      <div class="brand-text">
+        <h1>Travel Planner AI</h1>
+        <span class="badge model-badge"><i class="fa-solid fa-sparkles"></i> Gemini 3.6 Flash</span>
+      </div>
+    </div>
+
+    <div class="header-actions">
+      <button id="btn-save-itinerary" class="btn btn-primary">
+        <i class="fa-solid fa-floppy-disk"></i> Save Itinerary
+      </button>
+      <button id="btn-sync-agent" class="btn btn-secondary" title="Re-sync agent with latest itinerary file">
+        <i class="fa-solid fa-rotate"></i> Sync Agent
+      </button>
+      <a href="/api/itinerary" download="itinerary.md" class="btn btn-outline" style="text-decoration:none;">
+        <i class="fa-solid fa-download"></i> Export .md
+      </a>
+    </div>
+  </header>
+
+  <!-- App Main Content Grid (3 Panels) -->
+  <main class="app-container">
+
+    <!-- PANEL 1: Past Chats Menu / Sidebar -->
+    <aside class="sidebar-panel">
+      <div class="sidebar-header">
+        <h2><i class="fa-solid fa-clock-rotate-left"></i> Past Chats</h2>
+        <button id="btn-new-chat" class="btn btn-sm btn-accent">
+          <i class="fa-solid fa-plus"></i> New Chat
+        </button>
+      </div>
+
+      <div id="chats-list" class="chats-list">
+        <div class="loading-spinner"><i class="fa-solid fa-spinner fa-spin"></i> Loading chats...</div>
+      </div>
+    </aside>
+
+    <!-- PANEL 2: Chat & Observability Window -->
+    <section class="chat-panel">
+      <div class="chat-header">
+        <div class="active-session-info">
+          <h3 id="current-chat-title">New Travel Session</h3>
+          <span id="current-chat-id" class="session-id-tag">Session: <span class="id-val">initializing...</span></span>
+        </div>
+        <div class="observability-badge" title="Observability level: Full Tool Execution Tracing">
+          <i class="fa-solid fa-microscope"></i> Live Tool Trace Active
+        </div>
+      </div>
+
+      <!-- Messages Scroll Area -->
+      <div id="chat-messages" class="chat-messages">
+        <!-- Default Welcome Card -->
+        <div class="welcome-card">
+          <div class="welcome-icon">🗺️</div>
+          <h3>Welcome to Travel Planner AI!</h3>
+          <p>Ask me to plan a trip, fetch live weather using Open-Meteo, estimate budget breakdowns, or update your master <code>itinerary.md</code> file.</p>
+          
+          <div class="quick-prompts">
+            <span class="prompt-chip" data-prompt="Analyze my current itinerary.md file and suggest specific attraction or dinner restaurant recommendations to insert between my schedule bullets. Highlight any spots that require advance reservations! 🍽️">
+              🍽️ Recommend Dining & Spots (With Reservation Alerts)
+            </span>
+            <span class="prompt-chip" data-prompt="Please update my itinerary.md file with your latest recommendations, adding dinner spots and Kyoto days with reservation alerts! ✍️">
+              ✍️ Update Itinerary.md with Recommendations
+            </span>
+            <span class="prompt-chip" data-prompt="What is the live weather in Tokyo and Paris right now?">
+              ☀️ Live weather in Tokyo & Paris
+            </span>
+            <span class="prompt-chip" data-prompt="I want to plan a 5-day trip to Tokyo with a $2000 budget. I love food and culture. Update my itinerary.md!">
+              🍣 5-Day Tokyo Trip ($2000 budget)
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Chat Input Controls -->
+      <div class="chat-input-area">
+        <form id="chat-form" class="chat-form">
+          <div class="input-wrapper">
+            <textarea id="chat-input" placeholder="Type your travel request or question... (Press Enter to send, Shift+Enter for new line)" rows="2"></textarea>
+            <button type="submit" id="btn-send" class="btn btn-send">
+              <i class="fa-solid fa-paper-plane"></i> Send
+            </button>
+          </div>
+          <div class="input-footer">
+            <div class="footer-left">
+              <label class="claude-context-pill" title="Toggle including itinerary.md in agent context">
+                <input type="checkbox" id="chk-include-itinerary" checked>
+                <div class="pill-content">
+                  <i class="fa-solid fa-paperclip file-icon"></i>
+                  <span class="file-name">itinerary.md</span>
+                  <span class="pill-badge"><span class="dot"></span> Context</span>
+                </div>
+              </label>
+            </div>
+            
+            <div class="footer-right">
+              <div class="edit-mode-selector">
+                <label for="sel-edit-mode" class="mode-label"><i class="fa-solid fa-sliders"></i> Edit Permission:</label>
+                <select id="sel-edit-mode" class="mode-select">
+                  <option value="manual" selected>🛡️ Manual Approval</option>
+                  <option value="auto">⚡ Auto-Edit Mode</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <!-- PANEL 3: Itinerary Source of Truth (Markdown Editor & Formatted Preview) -->
+    <section class="itinerary-panel">
+      <div class="panel-header">
+        <div class="panel-title">
+          <h2><i class="fa-solid fa-file-lines"></i> Itinerary</h2>
+          <span class="file-tag"><code>itinerary.md</code></span>
+        </div>
+
+        <div class="tab-controls">
+          <button id="tab-edit" class="tab-btn active"><i class="fa-solid fa-code"></i> Edit (.md)</button>
+          <button id="tab-view" class="tab-btn"><i class="fa-solid fa-eye"></i> Formatted View</button>
+          <button id="tab-map" class="tab-btn"><i class="fa-solid fa-map-location-dot"></i> Map View</button>
+        </div>
+      </div>
+
+      <div class="editor-status-bar">
+        <span id="save-indicator" class="status-saved"><i class="fa-solid fa-check"></i> Saved to disk</span>
+        <span id="char-counter" class="char-count">0 chars</span>
+      </div>
+
+      <!-- Mode 1: Textarea Code Editor -->
+      <div id="editor-container" class="editor-container">
+        <textarea id="itinerary-editor" spellcheck="false" placeholder="Write or paste your markdown itinerary here..."></textarea>
+      </div>
+
+      <!-- Mode 2: Formatted HTML View -->
+      <div id="preview-container" class="preview-container hidden">
+        <div id="itinerary-preview" class="markdown-body"></div>
+      </div>
+
+      <!-- Mode 3: Interactive Multi-Marker Map View -->
+      <div id="map-container" class="map-container hidden">
+        <div class="map-toolbar">
+          <div class="map-toolbar-info">
+            <i class="fa-solid fa-map-location-dot text-primary"></i>
+            <span id="map-location-count">0 markers loaded</span>
+          </div>
+          <div class="map-toolbar-actions" style="display:flex; gap:8px; align-items:center;">
+            <select id="sel-map-location" class="map-select">
+              <option value="ALL">📍 All Itinerary Markers</option>
+            </select>
+            <button id="btn-toggle-map-provider" class="btn btn-sm btn-outline" title="Switch between Interactive Marker Map and Google Embed">
+              <i class="fa-solid fa-layer-group"></i> Embed View
+            </button>
+          </div>
+        </div>
+
+        <div class="map-frame-wrapper">
+          <div id="interactive-leaflet-map" style="width:100%; height:100%; z-index:1;"></div>
+          <iframe id="google-map-iframe" class="hidden" width="100%" height="100%" frameborder="0" style="border:0;" allowfullscreen="" loading="lazy" referrerpolicy="no-referrer-when-downgrade" src="https://maps.google.com/maps?q=Tokyo,Japan&t=&z=12&ie=UTF8&iwloc=&output=embed"></iframe>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
