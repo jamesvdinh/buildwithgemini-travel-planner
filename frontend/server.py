@@ -304,6 +304,14 @@ STATIC_DIR = BASE_DIR / "frontend" / "static"
 STATIC_DIR.mkdir(parents=True, exist_ok=True)
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
+@app.get("/style.css")
+def get_style_css():
+    return FileResponse(STATIC_DIR / "style.css")
+
+@app.get("/app.js")
+def get_app_js():
+    return FileResponse(STATIC_DIR / "app.js")
+
 @app.get("/")
 def read_root():
     return FileResponse(STATIC_DIR / "index.html")

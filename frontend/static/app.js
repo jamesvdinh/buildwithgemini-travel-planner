@@ -704,7 +704,7 @@ document.addEventListener('DOMContentLoaded', () => {
   async function switchSession(sessionId) {
     if (sessionId === currentSessionId) return;
     try {
-      const res = await fetch(`/api/chats/${sessionId}`);
+      const res = await fetch(`${API_BASE_URL}/api/chats/${sessionId}`);
       if (!res.ok) return;
       const data = await res.json();
       currentSessionId = sessionId;
@@ -726,7 +726,7 @@ document.addEventListener('DOMContentLoaded', () => {
   async function deleteSession(sessionId) {
     if (!confirm('Are you sure you want to delete this chat history?')) return;
     try {
-      await fetch(`/api/chats/${sessionId}`, { method: 'DELETE' });
+      await fetch(`${API_BASE_URL}/api/chats/${sessionId}`, { method: 'DELETE' });
       if (sessionId === currentSessionId) {
         await startNewChat();
       } else {
